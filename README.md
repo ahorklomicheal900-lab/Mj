@@ -103,3 +103,20 @@ Do not point this new schema at an existing production database blindly. If you 
 ## Security
 
 Passwords are hashed. Production sessions use `SECRET_KEY`. User input in generated reports is escaped. Role restrictions are checked on the server. The final owner account cannot be demoted or removed. Use `SEED_DEMO_USERS=0` in production.
+
+## Render deployment (fixed package)
+
+This package is intentionally structured with `app.py`, `templates/`, and `static/` at the repository root. In Render, use the repository root as the service Root Directory (leave it blank unless your repository contains this project inside a subfolder).
+
+Recommended settings:
+- Build Command: `pip install -r requirements.txt`
+- Start Command: `gunicorn app:app --bind 0.0.0.0:$PORT --workers 2 --timeout 120`
+- Health Check Path: `/health`
+
+The application explicitly resolves the `templates` and `static` directories relative to `app.py`, preventing the `TemplateNotFound: login.html` error caused by a mismatched working directory or missing template folder.
+
+### If Render still shows `TemplateNotFound: login.html`
+1. Confirm `templates/login.html` exists in the GitHub repository.
+2. Confirm `app.py` is in the same repository root as the `templates` folder.
+3. If using a Render Root Directory, set it to the folder containing `app.py` and `templates/`.
+4. Trigger a **Manual Deploy → Clear build cache & deploy** so Render doesn't reuse an old checkout.
