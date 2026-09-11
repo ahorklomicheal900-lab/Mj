@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ settings.shop_name }} — Sign in</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%A7%BE%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sora:wght@600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body class="auth-shell">
+    <div class="auth-card brand-fill">
+        <div class="brand-mark" style="margin-bottom:1.5rem;">🧾</div>
+        <p class="eyebrow">{{ settings.shop_name }}</p>
+        <h1>Welcome back to the counter.</h1>
+        <p class="auth-subtitle">Sign in to record today's sales and keep the running totals — and profit — live.</p>
+
+        {% if error %}
+        <div class="msg msg-error">{{ error }}</div>
+        {% endif %}
+
+        <form method="POST" action="{{ url_for('login') }}">
+            <div class="field">
+                <label for="username">Username</label>
+                <input type="text" id="username" name="username" placeholder="manager" required autofocus>
+            </div>
+            <div class="field">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" placeholder="••••••••" required>
+            </div>
+            <button type="submit" class="btn btn-primary btn-block">Sign in →</button>
+        </form>
+
+        <p style="margin-top:1.75rem; padding-top:1.25rem; border-top:1px solid var(--line); font-size:0.78rem; color:var(--ink-faint); letter-spacing:0.02em;">
+            Shop sales desk · access is limited to staff on shift
+        </p>
+    </div>
+</body>
+</html>

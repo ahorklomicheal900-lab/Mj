@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ settings.shop_name }}</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%A7%BE%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sora:wght@600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<div class="shell">
+    <div class="topbar">
+        <div class="brand">
+            <div class="brand-mark">🧾</div>
+            <div class="brand-text">
+                <h1>{{ settings.shop_name }}</h1>
+                <div class="brand-tagline">Shop Sales Desk</div>
+            </div>
+        </div>
+        <div class="nav-group">
+            <span class="badge badge-amber">{{ user.display_name }} · {{ user.role }}</span>
+            <a href="{{ url_for('change_password') }}" class="btn btn-ghost btn-sm">Password</a>
+            {% if user.role in ('manager', 'owner') %}
+            <a href="{{ url_for('team_dashboard') }}" class="btn btn-ghost btn-sm">Team</a>
+            {% endif %}
+            {% if user.role == 'owner' %}
+            <a href="{{ url_for('backstage') }}" class="btn btn-ghost btn-sm">Backstage</a>
+            {% endif %}
+            <form method="POST" action="{{ url_for('logout') }}" style="display:inline;">
+                <button type="submit" class="btn btn-outline btn-sm">Sign out</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="status-bar" class="ok"><span class="dot"></span><span id="status-text">Checking connection…</span></div>
+
+    <!-- Hero -->
+    <div class="hero">
+        <div class="hero-row">
+            <p class="eyebrow">Daily Snapshot</p>
+            <span class="hero-date" id="hero-date"></span>
+        </div>
+        <h2>Keep the counter moving.</h2>
+        <p class="sub">Record each sale as it happens, then leave the maths — and the profit tracking — to your sales API.</p>
+
+        <div class="hero-actions">
+            <button class="btn btn-outline" id="download-btn">⬇ Download report</button>
+            <button class="btn btn-danger" id="reset-btn">🗑 Reset day</button>
+        </div>
+
+        <div class="total-label">Total sales</div>
+        <div class="total-value" id="sum-total">{{ settings.currency }} 0.00</div>
+        <div class="live-tag"><span class="dot"></span> Live from your API</div>
+    </div>
+
+    <!-- Stat cards -->
+    <div class="stat-grid">
+        <div class="stat-card">
+            <div class="kicker">Sales Recorded</div>
+            <div class="label">Transactions</div>
+            <div class="value" id="sum-transactions">0</div>
+        </div>
+        <div class="stat-card">
+            <div class="kicker">Items Moved</div>
+            <div class="label">Units sold</div>
+            <div class="value" id="sum-units">0</div>
+        </div>
+        <div class="stat-card">
+            <div class="kicker">Most Units Moved</div>
+            <div class="label">Best seller</div>
+            <div class="value" id="sum-best">—</div>
+        </div>
+        <div class="stat-card">
+            <div class="kicker">Bottom Line</div>
+            <div class="label" id="profit-label">Profit / loss</div>
+            <div class="value flat" id="sum-profit">{{ settings.currency }} 0.00</div>
+        </div>
+    </div>
+
+    <!-- Profit chart -->
+    <div class="card chart-card">
+        <div class="chart-head">
+            <span class="chart-title">How the day is going</span>
+            <span class="chart-status flat" id="chart-status">Break even</span>
+        </div>
+        <canvas id="profit-chart"></canvas>
+        <div class="chart-empty" id="chart-empty">Add a sale with a cost price to see your profit trend here.</div>
+    </div>
+
+    <!-- Form -->
+    <div class="card">
+        <p class="card-kicker">New Transaction</p>
+        <h3 class="card-title">Record a sale</h3>
+        <p class="card-desc">Add a cost price too, and we'll work out whether you're making a profit — not just moving stock.</p>
+
+        <form id="sale-form">
+            <div class="field">
+                <label for="item">Item name</label>
+                <input type="text" id="item" name="item" placeholder="e.g. Sourdough loaf" required>
+            </div>
+            <div class="field-row">
+                <div class="field">
+                    <label for="unit_price">Selling price</label>
+                    <input type="number" id="unit_price" name="unit_price" min="0.01" step="0.01" placeholder="0.00" required>
+                </div>
+                <div class="field">
+                    <label for="cost_price">Cost price <span style="text-transform:none;">(optional)</span></label>
+                    <input type="number" id="cost_price" name="cost_price" min="0" step="0.01" placeholder="0.00">
+                </div>
+            </div>
+            <div class="field">
+                <label for="quantity">Quantity</label>
+                <input type="number" id="quantity" name="quantity" min="1" step="1" value="1" required>
+            </div>
+            <button type="submit" class="btn btn-primary btn-block">✓ Add sale →</button>
+        </form>
+        <div id="form-error" style="color:var(--red); font-size:0.85rem; margin-top:0.6rem; min-height:1.2em;"></div>
+    </div>
+
+    <!-- Transactions -->
+    <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:1rem;">
+            <div>
+                <p class="card-kicker">The Paper Trail</p>
+                <h3 class="card-title" style="font-size:1.15rem;">Today's transactions</h3>
+            </div>
+            <span class="badge badge-neutral" id="txn-count">0 records</span>
+        </div>
+
+        <div id="empty-state" class="empty-state">
+            <div class="icon">📋</div>
+            <div class="title">No sales on the sheet yet.</div>
+            <div class="desc">Add your first transaction above and it will appear here instantly.</div>
+        </div>
+
+        <div class="table-wrap">
+            <table id="txn-table" style="display:none;">
+                <thead>
+                    <tr><th>Time</th><th>Item</th><th>Price</th><th>Qty</th><th>Total</th><th>Profit</th></tr>
+                </thead>
+                <tbody id="transactions-body"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <footer class="app-footer">{{ settings.shop_name }} · Built for the busy moments</footer>
+</div>
+
+<script>
+const statusBar = document.getElementById('status-bar');
+const statusText = document.getElementById('status-text');
+const form = document.getElementById('sale-form');
+const formError = document.getElementById('form-error');
+const transactionsBody = document.getElementById('transactions-body');
+const emptyState = document.getElementById('empty-state');
+const txnTable = document.getElementById('txn-table');
+const txnCount = document.getElementById('txn-count');
+const chartCanvas = document.getElementById('profit-chart');
+const chartEmpty = document.getElementById('chart-empty');
+const chartStatus = document.getElementById('chart-status');
+
+document.getElementById('hero-date').textContent = new Date().toLocaleDateString(undefined, {
+    weekday: 'long', month: 'short', day: 'numeric', year: 'numeric'
+});
+
+function setStatus(ok, message) {
+    statusText.textContent = message;
+    statusBar.className = ok ? 'ok' : 'error';
+}
+
+function renderSummary(summary) {
+    document.getElementById('sum-total').textContent = `{{ settings.currency }} ${summary.total_sales.toFixed(2)}`;
+    document.getElementById('sum-transactions').textContent = summary.num_transactions;
+    document.getElementById('sum-units').textContent = summary.total_units;
+    document.getElementById('sum-best').textContent = summary.best_selling_item || '—';
+
+    const profitEl = document.getElementById('sum-profit');
+    const labelEl = document.getElementById('profit-label');
+    profitEl.textContent = `{{ settings.currency }} ${summary.total_profit.toFixed(2)}`;
+    profitEl.classList.remove('up', 'down', 'flat');
+    if (summary.profit_status === 'profit') {
+        profitEl.classList.add('up');
+        labelEl.textContent = "You're in profit";
+    } else if (summary.profit_status === 'loss') {
+        profitEl.classList.add('down');
+        labelEl.textContent = "You're at a loss";
+    } else {
+        profitEl.classList.add('flat');
+        labelEl.textContent = 'Break even';
+    }
+}
+
+function renderTransactions(transactions) {
+    txnCount.textContent = `${transactions.length} record${transactions.length === 1 ? '' : 's'}`;
+
+    if (!transactions.length) {
+        emptyState.style.display = 'block';
+        txnTable.style.display = 'none';
+    } else {
+        emptyState.style.display = 'none';
+        txnTable.style.display = 'table';
+
+        transactionsBody.innerHTML = transactions.slice().reverse().map(t => {
+            const profit = t.profit || 0;
+            const cls = profit > 0 ? 'profit-up' : (profit < 0 ? 'profit-down' : '');
+            return `
+            <tr>
+                <td>${t.time}</td>
+                <td>${t.item}</td>
+                <td>${t.unit_price.toFixed(2)}</td>
+                <td>${t.quantity}</td>
+                <td>${t.line_total.toFixed(2)}</td>
+                <td class="${cls}">${profit.toFixed(2)}</td>
+            </tr>`;
+        }).join('');
+    }
+
+    renderChart(transactions);
+}
+
+function renderChart(transactions) {
+    if (!transactions.length) {
+        chartCanvas.style.display = 'none';
+        chartEmpty.style.display = 'block';
+        chartStatus.textContent = 'Break even';
+        chartStatus.className = 'chart-status flat';
+        return;
+    }
+    chartCanvas.style.display = 'block';
+    chartEmpty.style.display = 'none';
+
+    // Cumulative profit across the day's transactions, in the order they happened.
+    let running = 0;
+    const points = transactions.map(t => {
+        running += (t.profit || 0);
+        return running;
+    });
+
+    const last = points[points.length - 1];
+    if (last > 0) {
+        chartStatus.textContent = 'Trending up';
+        chartStatus.className = 'chart-status up';
+    } else if (last < 0) {
+        chartStatus.textContent = 'Trending down';
+        chartStatus.className = 'chart-status down';
+    } else {
+        chartStatus.textContent = 'Break even';
+        chartStatus.className = 'chart-status flat';
+    }
+
+    const dpr = window.devicePixelRatio || 1;
+    const cssWidth = chartCanvas.clientWidth || chartCanvas.parentElement.clientWidth;
+    const cssHeight = 130;
+    chartCanvas.width = cssWidth * dpr;
+    chartCanvas.height = cssHeight * dpr;
+    chartCanvas.style.width = cssWidth + 'px';
+    chartCanvas.style.height = cssHeight + 'px';
+
+    const ctx = chartCanvas.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, cssWidth, cssHeight);
+
+    const padding = 10;
+    const maxAbs = Math.max(...points.map(v => Math.abs(v)), 1);
+    const midY = cssHeight / 2;
+    const usableHeight = (cssHeight / 2) - padding;
+    const stepX = points.length > 1 ? (cssWidth - padding * 2) / (points.length - 1) : 0;
+
+    // Zero baseline
+    ctx.strokeStyle = 'rgba(245,241,232,0.15)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(0, midY);
+    ctx.lineTo(cssWidth, midY);
+    ctx.stroke();
+
+    // Line
+    ctx.beginPath();
+    points.forEach((v, i) => {
+        const x = padding + stepX * i;
+        const y = midY - (v / maxAbs) * usableHeight;
+        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    });
+    ctx.strokeStyle = last >= 0 ? '#3ddc9b' : '#f7776f';
+    ctx.lineWidth = 2.5;
+    ctx.lineJoin = 'round';
+    ctx.stroke();
+
+    // Dots
+    points.forEach((v, i) => {
+        const x = padding + stepX * i;
+        const y = midY - (v / maxAbs) * usableHeight;
+        ctx.beginPath();
+        ctx.arc(x, y, 3, 0, Math.PI * 2);
+        ctx.fillStyle = v >= 0 ? '#3ddc9b' : '#f7776f';
+        ctx.fill();
+    });
+}
+
+async function refreshSummary() {
+    try {
+        const res = await fetch('/api/summary');
+        if (res.status === 401) { window.location.href = '/login'; return; }
+        if (!res.ok) throw new Error('Server error');
+        const data = await res.json();
+        renderSummary(data.summary);
+        renderTransactions(data.transactions);
+        setStatus(true, 'Connected — live updates working');
+    } catch (err) {
+        setStatus(false, "Can't reach the server. Check that the app is running.");
+    }
+}
+
+form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    formError.textContent = '';
+
+    const item = document.getElementById('item').value.trim();
+    const unit_price = document.getElementById('unit_price').value;
+    const cost_price = document.getElementById('cost_price').value;
+    const quantity = document.getElementById('quantity').value;
+
+    try {
+        const res = await fetch('/api/sale', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ item, unit_price, cost_price, quantity })
+        });
+        if (res.status === 401) { window.location.href = '/login'; return; }
+        const data = await res.json();
+
+        if (!res.ok) {
+            formError.textContent = data.error || 'Could not record sale.';
+            return;
+        }
+
+        renderSummary(data.summary);
+        renderTransactions(data.transactions);
+        form.reset();
+        document.getElementById('quantity').value = 1;
+        document.getElementById('item').focus();
+        setStatus(true, 'Connected — live updates working');
+    } catch (err) {
+        setStatus(false, 'Cannot reach the server. Your sale was not saved — try again.');
+    }
+});
+
+document.getElementById('download-btn').addEventListener('click', () => {
+    window.location.href = '/api/report';
+});
+
+document.getElementById('reset-btn').addEventListener('click', async () => {
+    const confirmed = confirm("Reset today's transactions? This cannot be undone.");
+    if (!confirmed) return;
+
+    try {
+        const res = await fetch('/api/reset', { method: 'POST' });
+        if (res.status === 401) { window.location.href = '/login'; return; }
+        if (!res.ok) throw new Error('Server error');
+        const data = await res.json();
+        renderSummary(data.summary);
+        renderTransactions(data.transactions);
+        setStatus(true, 'Connected — live updates working');
+    } catch (err) {
+        setStatus(false, 'Cannot reach the server. Reset may not have completed.');
+    }
+});
+
+window.addEventListener('resize', () => refreshSummary());
+
+refreshSummary();
+setInterval(refreshSummary, 8000);
+</script>
+</body>
+</html>

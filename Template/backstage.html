@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ settings.shop_name }} — Backstage</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%A7%BE%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sora:wght@600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<div class="shell shell-wide">
+    <div class="topbar">
+        <div>
+            <a href="{{ url_for('index') }}" class="back-link">← Back to the desk</a>
+            <p class="eyebrow" style="margin-top:0.9rem;">Owner Only</p>
+            <h1 style="font-size:1.7rem;">Backstage</h1>
+        </div>
+        <form method="POST" action="{{ url_for('logout') }}">
+            <button type="submit" class="btn btn-outline btn-sm">Sign out</button>
+        </form>
+    </div>
+    <p class="card-desc" style="margin:-0.5rem 0 1.4rem;">Full control: manage staff accounts, see who's been signing in, and edit shop-wide settings. Signed in as {{ current_username }}.</p>
+
+    {% if error %}<div class="msg msg-error">{{ error }}</div>{% endif %}
+    {% if success %}<div class="msg msg-success">{{ success }}</div>{% endif %}
+
+    <!-- Shop settings -->
+    <div class="card">
+        <h2 class="card-title" style="font-size:1.2rem;">Shop settings</h2>
+        <p class="card-desc">Change the name and currency shown across the whole app and on reports.</p>
+        <form method="POST" action="{{ url_for('backstage_settings') }}">
+            <div class="field-row">
+                <div class="field">
+                    <label for="shop_name">Shop name</label>
+                    <input type="text" id="shop_name" name="shop_name" value="{{ settings.shop_name }}">
+                </div>
+                <div class="field">
+                    <label for="currency">Currency label</label>
+                    <input type="text" id="currency" name="currency" value="{{ settings.currency }}">
+                </div>
+            </div>
+            <button type="submit" class="btn btn-primary">Save settings</button>
+        </form>
+    </div>
+
+    <!-- Staff accounts -->
+    <div class="card">
+        <h2 class="card-title" style="font-size:1.2rem;">Staff accounts</h2>
+        <p class="card-desc">Add manager accounts for staff, or another owner account if you need a second person with full control.</p>
+
+        <div class="table-wrap">
+            <table>
+                <thead><tr><th>Username</th><th>Name</th><th>Manage</th></tr></thead>
+                <tbody>
+                    {% for uname, info in users.items() %}
+                    <tr>
+                        <td>{{ uname }}</td>
+                        <td>{{ info.display_name }}</td>
+                        <td>
+                            <form method="POST" action="{{ url_for('backstage_update_role') }}" style="margin-bottom:0.4rem;">
+                                <input type="hidden" name="username" value="{{ uname }}">
+                                <select name="role" class="role-select" onchange="this.form.querySelector('button').style.display='inline-flex'">
+                                    <option value="employee" {% if info.role == 'employee' %}selected{% endif %}>Employee</option>
+                                    <option value="manager" {% if info.role == 'manager' %}selected{% endif %}>Manager</option>
+                                    <option value="owner" {% if info.role == 'owner' %}selected{% endif %}>Owner</option>
+                                </select>
+                                <button type="submit" class="btn btn-sm" style="display:none; margin-top:0.35rem; color:#86eec1; border:1px solid rgba(61,220,155,0.35); background:rgba(61,220,155,0.08);">Save role</button>
+                            </form>
+                            {% if uname != current_username %}
+                            <form method="POST" action="{{ url_for('backstage_remove_user') }}" onsubmit="return confirm('Remove {{ uname }}? This cannot be undone.');">
+                                <input type="hidden" name="username" value="{{ uname }}">
+                                <button type="submit" class="btn btn-danger btn-sm">Remove</button>
+                            </form>
+                            {% else %}
+                            <span style="color:var(--ink-dim); font-size:0.78rem;">You</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <h2 class="card-title" style="margin-top:1.6rem; font-size:1.1rem;">Add a new account</h2>
+        <form method="POST" action="{{ url_for('backstage_add_user') }}">
+            <div class="field-row">
+                <div class="field">
+                    <label for="new_username">Username</label>
+                    <input type="text" id="new_username" name="new_username" required>
+                </div>
+                <div class="field">
+                    <label for="new_display_name">Display name</label>
+                    <input type="text" id="new_display_name" name="new_display_name">
+                </div>
+            </div>
+            <div class="field-row">
+                <div class="field">
+                    <label for="new_password">Password</label>
+                    <input type="password" id="new_password" name="new_password" minlength="6" required>
+                </div>
+                <div class="field">
+                    <label for="new_role">Role</label>
+                    <select id="new_role" name="new_role">
+                        <option value="employee">Employee — front-line access</option>
+                        <option value="manager">Manager — everyday access + Team dashboard</option>
+                        <option value="owner">Owner — full backstage control</option>
+                    </select>
+                </div>
+            </div>
+            <button type="submit" class="btn btn-primary">Add account</button>
+        </form>
+    </div>
+
+    <!-- Activity log -->
+    <div class="card">
+        <h2 class="card-title" style="font-size:1.15rem;">Activity log</h2>
+        <p class="card-desc">What each account has actually done while signed in — not just when they logged in.</p>
+
+        {% if recent_activity %}
+        <div class="scroll-table table-wrap">
+            <table>
+                <thead><tr><th>Time</th><th>User</th><th>Action</th></tr></thead>
+                <tbody>
+                    {% for entry in recent_activity %}
+                    <tr>
+                        <td>{{ entry.time }}</td>
+                        <td>{{ entry.display_name }}</td>
+                        <td>{{ entry.action }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="empty-note">No activity recorded yet this session.</p>
+        {% endif %}
+    </div>
+
+    <!-- Login history -->
+    <div class="card">
+        <h2 class="card-title" style="font-size:1.15rem;">Recent sign-ins</h2>
+        <p class="card-desc">Every login attempt, successful or not, so you can see who's been accessing the desk.</p>
+
+        {% if recent_logins %}
+        <div class="scroll-table table-wrap">
+            <table>
+                <thead><tr><th>Time</th><th>Username</th><th>Result</th><th>IP</th></tr></thead>
+                <tbody>
+                    {% for entry in recent_logins %}
+                    <tr>
+                        <td>{{ entry.time }}</td>
+                        <td>{{ entry.username }}</td>
+                        <td>
+                            {% if entry.success %}
+                            <span class="badge badge-green">Success</span>
+                            {% else %}
+                            <span class="badge badge-red">Failed</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ entry.ip }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="empty-note">No sign-ins recorded yet this session.</p>
+        {% endif %}
+    </div>
+
+    <footer class="app-footer">{{ settings.shop_name }} · Backstage · Owner access only</footer>
+</div>
+</body>
+</html>
